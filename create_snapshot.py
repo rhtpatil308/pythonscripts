@@ -9,6 +9,7 @@ from xml.etree.ElementTree import dump
 from colorlog import ColoredFormatter
 from pyVim.task import WaitForTask
 from pyVim import connect
+from tqdm import tqdm
 import csv
 
 try:
@@ -65,49 +66,49 @@ class SnapshotManager(object):
     @classmethod
     def create_snapshot(cls, vs_host, vs_user, vs_pass):
         try:
-            cls.log.debug("connecting to vcenter . . .")
+            cls.log.debug("connecting to vcenter...")
             v_server = connect.ConnectNoSSL(host=vs_host, user=vs_user,
                                             pwd=vs_pass, port=443)
             content = v_server.RetrieveContent()
             get_version = content.about
-            cls.log.info(f"[+] successfully connected to version {get_version.fullName}")
+            cls.log.info(f"Successfully connected to version {get_version.fullName}")
 
-            cls.log.debug("[+] reading server list . . .")
+            cls.log.debug("Reading server list...")
             server_cfg = os.path.join(sys.path[0], 'servers.ini')
             with open(server_cfg) as fd:
-                # servers = fd.read().splitlines()
                 server = csv.reader(fd)
                 for row in server:
                     vm_name = row[0]
                     cl_name = row[1]
-            objview = content.viewManager.CreateContainerView(content.rootFolder, [vim.Datacenter], True)
-            dcList = objview.view
-            objview.Destroy()
-            for dc in dcList:
-                for cl in dc.hostFolder.childEntity:
-                    if cl.name == cl_name:
-                        for host in cl.host:
-                            for vm in host.vm:
-                                if vm.name == vm_name:
-                                    cls.log.info("Found virtual machine %s" %vm_name)
-                                    vm_obj = cls.get_obj(content, [vim.VirtualMachine], vm_name)
-                                    cls.log.info("------ CREATING SNAPSHOT OF VM ------")
-                                    cls.log.info(f"Creating snapshot of {vm_name}")
-                                    snapshot_name = vm_name + "-" + str(datetime.now())
-                                    description = f"This {snapshot_name} is taken by {vs_user}, " \
-                                                  f"Before removing this snapshot " \
-                                                  f"contact with {vs_user}"
-                                    dump_memory = False
-                                    quiesce = False
-                                    cls.log.debug("Snapshot creation process started, please wait until complete...")
-                                    WaitForTask(vm_obj.CreateSnapshot(snapshot_name, description, dump_memory, quiesce))
-                                    cls.log.debug("Snapshot created successfully")
-                                    cls.log.info("------ SNAPSHOT DETAILS ------")
-                                    snapshots = cls.get_all_vm_snapshots(vm_name)
-                                    if len(snapshots) > 0:
-                                        for snapshot in snapshots:
-                                            cls.log.debug(f"SNAPSHOT NAME : {snapshot.name}")
-                                            cls.log.info("------ ------ ------ ------")
+                    cls.log.info("Vm name is [%s] and it is in [%s] Cluster" %(vm_name,cl_name))
+                    objview = content.viewManager.CreateContainerView(content.rootFolder, [vim.Datacenter], True)
+                    dcList = objview.view
+                    objview.Destroy()
+                    cls.log.info("Checking datacenters and cluster for VM...")
+                    for dc in dcList:
+                        for cl in dc.hostFolder.childEntity:
+                            if cl_name == cl.name:
+                                for host in cl.host:
+                                    for vm in host.vm:
+                                        if vm_name == vm.name:
+                                            cls.log.info("Found virtual machine [%s]" %vm_name)
+                                            vm_obj = cls.get_obj(content, [vim.VirtualMachine], vm_name)
+                                            cls.log.info("------ CREATING SNAPSHOT OF VM ------")
+                                            cls.log.info(f"Creating snapshot of {vm_name}")
+                                            snapshot_name = vm_name + "-Before-patching"
+                                            description = f"This {snapshot_name} is taken by {vs_user}, " \
+                                                          f"Before removing this snapshot " \
+                                                          f"contact with {vs_user}"
+                                            dump_memory = True
+                                            quiesce = False
+                                            cls.log.debug("Snapshot creation process started, please wait until complete...")
+                                            WaitForTask(vm_obj.CreateSnapshot(snapshot_name, description, dump_memory, quiesce))
+                                            cls.log.debug("Snapshot created successfully")
+                                            cls.log.info("------ SNAPSHOT DETAILS ------")
+                                            snapshots = vm.snapshot.rootSnapshotList
+                                            for snapshot in snapshots:
+                                                if snapshot_name == snapshot.name:
+                                                    cls.log.debug(f"SNAPSHOT NAME : {snapshot.name}")
             cls.log.info("------ DONE ------")
         except Exception as ex:
             cls.log.error(ex)
