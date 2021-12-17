@@ -1,5 +1,5 @@
 """
-@title: delete_snapshots.py
+@title: delete-snapshots.py
 @description: Delete snapshot of given servers list.
 """
 # standard modules import
@@ -9,6 +9,7 @@ from xml.etree.ElementTree import dump
 from colorlog import ColoredFormatter
 from pyVim.task import WaitForTask
 from pyVim import connect
+from tqdm import tqdm
 import csv
 import re
 
@@ -89,28 +90,28 @@ class SnapshotManager(object):
                 for row in server:
                     vm_name = row[0]
                     cl_name = row[1]
-            objview = content.viewManager.CreateContainerView(content.rootFolder, [vim.Datacenter], True)
-            dcList = objview.view
-            objview.Destroy()
-            for dc in dcList:
-                for cl in dc.hostFolder.childEntity:
-                    if cl.name == cl_name:
-                        for host in cl.host:
-                            for vm in host.vm:
-                                if vm.name == vm_name:
-                                    cls.log.info("Found virtual machine %s" %vm_name)
-                                    cls.log.info("Checking snapshot of virtual machine %s" %vm_name)
-                                    snapshots = cls.get_all_vm_snapshots(vm)
-                                    snap_pat = r"%s-Before-patching" %vm_name
-                                    for snapshot in snapshots:
-                                        if snapshot.name == snap_pat:
-                                            cls.log.debug(f"SNAPSHOT NAME : {snapshot.name}")
-                                            cls.log.info(f"Deleting snapshot of {snapshot.name}")
-                                            snap_obj = snapshot.snapshot
-                                            cls.log.debug(f"Deleting snapshot of {vm_name} is started,"
-                                                          f"please wait util process done")
-                                            WaitForTask(snap_obj.RemoveSnapshot_Task(True))
-                                            cls.log.debug("Snapshot successfully deleted")
+                    objview = content.viewManager.CreateContainerView(content.rootFolder, [vim.Datacenter], True)
+                    dcList = objview.view
+                    objview.Destroy()
+                    for dc in dcList:
+                        for cl in dc.hostFolder.childEntity:
+                            if cl.name == cl_name:
+                                for host in cl.host:
+                                    for vm in host.vm:
+                                        if vm.name == vm_name:
+                                            cls.log.info("Found virtual machine %s" %vm_name)
+                                            cls.log.info("Checking snapshot of virtual machine %s" %vm_name)
+                                            snapshots = cls.get_all_vm_snapshots(vm)
+                                            snap_pat = r"%s-Before-patching" %vm_name
+                                            for snapshot in snapshots:
+                                                if snapshot.name == snap_pat:
+                                                    cls.log.debug(f"SNAPSHOT NAME : {snapshot.name}")
+                                                    cls.log.info(f"Deleting snapshot of {snapshot.name}")
+                                                    snap_obj = snapshot.snapshot
+                                                    cls.log.debug(f"Deleting snapshot of {vm_name} is started,"
+                                                                  f"please wait util process done")
+                                                    WaitForTask(snap_obj.RemoveSnapshot_Task(True))
+                                                    cls.log.debug("Snapshot successfully deleted")
             cls.log.info("------ DONE ------")
         except Exception as ex:
             cls.log.error(ex)
